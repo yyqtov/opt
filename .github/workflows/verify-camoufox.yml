@@ -1,0 +1,65 @@
+name: 🔬 OptikLink Camoufox 验证
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: 🔬 单账号验证
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 📥 拉取私库代码
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/OptikLink-Keep-Private
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+
+      - name: 🐍 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 📦 安装依赖
+        run: |
+          python -m pip install --upgrade playwright 'requests[socks]' camoufox[geoip] playwright-captcha==0.1.1
+          sudo apt-get update && sudo apt-get install -y xvfb
+          sudo $(which playwright) install-deps firefox || true
+          python -m camoufox fetch
+
+      - name: 💾 缓存 Camoufox
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/camoufox
+          key: camoufox-${{ runner.os }}
+
+      - name: 🖥️ 启动 Xvfb
+        run: |
+          Xvfb :99 -screen 0 1280x720x24 -ac +extension GLX +render -noreset > /dev/null 2>&1 &
+          sleep 2
+          echo "DISPLAY=:99" >> $GITHUB_ENV
+
+      - name: 🛡️ 下载 GOST
+        run: |
+          VERSION=$(curl -s https://api.github.com/repos/ginuerzh/gost/releases/latest \
+            | grep '"tag_name"' | cut -d'"' -f4 | tr -d 'v')
+          echo "📦 GOST 版本: $VERSION"
+          wget -q "https://github.com/ginuerzh/gost/releases/download/v${VERSION}/gost_${VERSION}_linux_amd64.tar.gz"
+          tar -xzf "gost_${VERSION}_linux_amd64.tar.gz"
+          chmod +x gost
+          echo "✅ GOST 下载完成"
+
+      - name: 🔬 运行验证脚本
+        env:
+          DISCORD_ACCOUNT: ${{ secrets.DISCORD_ACCOUNT }}
+          GOST_BIN: ./gost
+          DISPLAY: :99
+        run: python3 verify_camoufox.py
+
+      - name: 📸 上传验证截图
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-result
+          path: verify_result.png
+          retention-days: 7
