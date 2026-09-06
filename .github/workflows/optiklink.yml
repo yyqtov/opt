@@ -1,7 +1,13 @@
 name: 🎮 OptikLink-Keep
 on:
-
+  schedule:
+    - cron: '0 1 */2 * *'
   workflow_dispatch:
+    inputs:
+      probe_only:
+        description: '探针模式（1=只观测门/Turnstile，跳过面板步骤；留空=正常续期）'
+        required: false
+        default: ''
 
 jobs:
   keepalive:
@@ -41,6 +47,7 @@ jobs:
           DISCORD_ACCOUNT: ${{ secrets.DISCORD_ACCOUNT }}
           TG_BOT:          ${{ secrets.TG_BOT }}
           GOST_BIN:        ./gost
+          PROBE_ONLY:      ${{ github.event.inputs.probe_only }}
         run: npx playwright test
 
       - name: 📸 上传失败截图
